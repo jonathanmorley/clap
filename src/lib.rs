@@ -16,12 +16,15 @@
     trivial_numeric_casts,
     clippy::single_char_pattern
 )]
-#![forbid(unsafe_code)]
+//#![forbid(unsafe_code)]
 // HACK https://github.com/rust-lang/rust-clippy/issues/7290
 #![allow(clippy::single_component_path_imports)]
 #![allow(clippy::branches_sharing_code)]
 // Doesn't allow for debug statements, etc to be unique
 #![allow(clippy::if_same_then_else)]
+
+use wasm_bindgen::prelude::*;
+use js_sys::Array;
 
 #[cfg(not(feature = "std"))]
 compile_error!("`std` feature is currently required to build `clap`");
@@ -118,4 +121,34 @@ impl SubCommand {
         #![allow(deprecated)]
         Command::from_yaml(yaml)
     }
+}
+
+#[wasm_bindgen]
+extern "C" {
+    // Use `js_namespace` here to bind `console.log(..)` instead of just
+    // `log(..)`
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+#[cfg(feature = "yaml")]
+#[wasm_bindgen]
+pub fn get_matches(spec: String, args: Array) -> Result<ArgMatches, String> {
+    let specs = yaml_rust::YamlLoader::load_from_str(&spec).map_err(|e| e.to_string())?;
+    //log(&format!("Spec: {:?}", specs));
+    
+    let command = Command::from_yaml(&specs[0]);
+    //log(&format!("Command: {:?}", command));
+    
+    let str_args: Vec<String> = args
+        .iter()
+        .map(|arg| arg.as_string().ok_or_else(|| format!("{:?} is not a string", arg)))
+        .skip(1) // Because node args contain the path to the `node` executable too.
+        .collect::<Result<_, String>>()?;
+    //log(&format!("Args: {:?}", str_args));
+
+    let matches = command.try_get_matches_from(str_args).map_err(|e| e.to_string())?;
+    //log(&format!("Matches: {:?}", matches));
+    
+    Ok(matches)
 }

@@ -1,3 +1,5 @@
+use serde::{Serialize, Serializer};
+
 use crate::util::fnv::Key;
 
 use std::{
@@ -6,11 +8,13 @@ use std::{
     ops::Deref,
 };
 
-#[derive(Clone, Eq, Default)]
+#[derive(Clone, Eq, Default, Serialize)]
 #[cfg_attr(not(debug_assertions), repr(transparent))]
+#[cfg_attr(not(debug_assertions), serde(transparent))]
 pub(crate) struct Id {
     #[cfg(debug_assertions)]
     name: String,
+    #[serde(serialize_with = "serialize_id")]
     id: u64,
 }
 
@@ -89,4 +93,22 @@ impl PartialEq for Id {
     fn eq(&self, other: &Id) -> bool {
         self.id == other.id
     }
+}
+
+// The signature of a serialize_with function must follow the pattern:
+//
+//    fn serialize<S>(&T, S) -> Result<S::Ok, S::Error>
+//    where
+//        S: Serializer
+//
+// although it may also be generic over the input types T.
+pub fn serialize_id<S>(
+    id: &u64,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let s = id.to_string();
+    serializer.serialize_str(&s)
 }

@@ -5,16 +5,19 @@ use std::{
     slice::Iter,
 };
 
+use serde::Serialize;
+
 use crate::build::ArgPredicate;
 use crate::parse::ValueSource;
 use crate::util::eq_ignore_case;
 use crate::INTERNAL_ERROR_MSG;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct MatchedArg {
     occurs: u64,
     ty: Option<ValueSource>,
     indices: Vec<usize>,
+    #[serde(skip_serializing)]
     vals: Vec<Vec<OsString>>,
     ignore_case: bool,
     invalid_utf8_allowed: Option<bool>,

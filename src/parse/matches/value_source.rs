@@ -1,5 +1,7 @@
+use serde::Serialize;
+
 /// Origin of the argument's value
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[non_exhaustive]
 pub enum ValueSource {
     /// Value came [`Arg::default_value`][crate::Arg::default_value]

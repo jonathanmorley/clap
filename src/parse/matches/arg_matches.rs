@@ -10,6 +10,8 @@ use std::{
 
 // Third Party
 use indexmap::IndexMap;
+use wasm_bindgen::prelude::wasm_bindgen;
+use serde::Serialize;
 
 // Internal
 use crate::parse::MatchedArg;
@@ -66,7 +68,8 @@ use crate::{Error, INVALID_UTF8};
 /// }
 /// ```
 /// [`Command::get_matches`]: crate::Command::get_matches()
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[wasm_bindgen]
 pub struct ArgMatches {
     #[cfg(debug_assertions)]
     pub(crate) valid_args: Vec<Id>,
@@ -78,30 +81,88 @@ pub struct ArgMatches {
     pub(crate) subcommand: Option<Box<SubCommand>>,
 }
 
+#[wasm_bindgen]
 impl ArgMatches {
-    /// Check if any args were present on the command line
+    /// Gets the value of a specific option or positional argument.
+    ///
+    /// i.e. an argument that [takes an additional value][crate::Arg::takes_value] at runtime.
+    ///
+    /// Returns `None` if the option wasn't present.
+    ///
+    /// *NOTE:* Prefer [`ArgMatches::values_of`] if getting a value for an option or positional
+    /// argument that allows multiples as `ArgMatches::value_of` will only return the *first*
+    /// value.
+    ///
+    /// *NOTE:* This will always return `Some(value)` if [`default_value`] has been set.
+    /// [`occurrences_of`] can be used to check if a value is present at runtime.
+    ///
+    /// # Panics
+    ///
+    /// If the value is invalid UTF-8.  See
+    /// [`Arg::allow_invalid_utf8`][crate::Arg::allow_invalid_utf8].
+    ///
+    /// If `id` is is not a valid argument or group name.
     ///
     /// # Examples
     ///
     /// ```rust
     /// # use clap::{Command, Arg};
-    /// let mut cmd = Command::new("myapp")
+    /// let m = Command::new("myapp")
     ///     .arg(Arg::new("output")
-    ///         .takes_value(true));
+    ///         .takes_value(true))
+    ///     .get_matches_from(vec!["myapp", "something"]);
     ///
-    /// let m = cmd
-    ///     .try_get_matches_from_mut(vec!["myapp", "something"])
-    ///     .unwrap();
-    /// assert!(m.args_present());
-    ///
-    /// let m = cmd
-    ///     .try_get_matches_from_mut(vec!["myapp"])
-    ///     .unwrap();
-    /// assert!(! m.args_present());
-    pub fn args_present(&self) -> bool {
-        !self.args.is_empty()
+    /// assert_eq!(m.value_of("output"), Some("something"));
+    /// ```
+    /// [option]: crate::Arg::takes_value()
+    /// [positional]: crate::Arg::index()
+    /// [`ArgMatches::values_of`]: ArgMatches::values_of()
+    /// [`default_value`]: crate::Arg::default_value()
+    /// [`occurrences_of`]: crate::ArgMatches::occurrences_of()
+    pub fn value_of_s(&self, id: String) -> Option<String> {
+        let id = Id::from(id);
+        let arg = self.get_arg(&id)?;
+        assert_utf8_validation(arg, &id);
+        let v = arg.first()?;
+        Some(v.to_str().expect(INVALID_UTF8).to_string())
     }
 
+    /// Check if an argument was present at runtime.
+    ///
+    /// *NOTE:* This will always return `true` if [`default_value`] has been set.
+    /// [`occurrences_of`] can be used to check if a value is present at runtime.
+    ///
+    /// # Panics
+    ///
+    /// If `id` is is not a valid argument or group name.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use clap::{Command, Arg};
+    /// let m = Command::new("myprog")
+    ///     .arg(Arg::new("debug")
+    ///         .short('d'))
+    ///     .get_matches_from(vec![
+    ///         "myprog", "-d"
+    ///     ]);
+    ///
+    /// assert!(m.is_present("debug"));
+    /// ```
+    ///
+    /// [`default_value`]: crate::Arg::default_value()
+    /// [`occurrences_of`]: ArgMatches::occurrences_of()
+    pub fn is_present_s(&self, id: String) -> bool {
+        let id = Id::from(id);
+
+        #[cfg(debug_assertions)]
+        self.get_arg(&id);
+
+        self.args.contains_key(&id)
+    }
+}
+
+impl ArgMatches {
     /// Gets the value of a specific option or positional argument.
     ///
     /// i.e. an argument that [takes an additional value][crate::Arg::takes_value] at runtime.
@@ -1147,7 +1208,7 @@ impl ArgMatches {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct SubCommand {
     pub(crate) id: Id,
     pub(crate) name: String,
